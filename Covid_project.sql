@@ -1,32 +1,16 @@
---SELECT TOP 20 *
---FROM Portfolio_Project.dbo.Covid_deaths
---ORDER BY 3,4
+/*
+Covid-19 Data Exploration 
+Skills used: Joins, CTE's, Temp Tables, Windows Functions, Aggregate Functions, Creating Views, Converting Data Types
+Project is based on guided tutorial from @Alex The Analyst
+14.08.2022
+*/
 
---SELECT TOP 20 *
---FROM Portfolio_Project.dbo.Covid_vaccinations
---ORDER BY 3,4
-
-
-
---Select data that we are going to be using 
+-- Select project that we are going to be using 
 USE Portfolio_Project
 GO
 
 
-
-SELECT TOP 20 location, date, total_cases, new_cases, total_deaths, population
-FROM Portfolio_Project.dbo.Covid_deaths
-ORDER BY 1,2
-
--- missing population
-
--- Looking at total cases vs total deaths
-SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 AS death_perc
-FROM Portfolio_Project.dbo.Covid_deaths AS deaths
-WHERE location like '%States%'
-ORDER BY 1,2
-
--- add population to the fist table
+-- Add population to the fist table
 ALTER TABLE Portfolio_Project.dbo.Covid_deaths ADD population bigint NULL, column_c INT NULL;
 
 UPDATE Portfolio_Project.dbo.Covid_deaths
@@ -34,17 +18,35 @@ SET Portfolio_Project.dbo.Covid_deaths.population = vaccs.population
 FROM Portfolio_Project.dbo.Covid_deaths AS deaths
 LEFT JOIN Portfolio_Project.dbo.Covid_vaccinations AS vaccs ON deaths.location = vaccs.location AND deaths.date = vaccs.date
 
--- Looking at total cases vs population
+
+-- Peek at the data that we are going to be starting with
+SELECT TOP 20 location, date, total_cases, new_cases, total_deaths, population
+FROM Portfolio_Project.dbo.Covid_deaths
+WHERE continent is not null
+ORDER BY 1,2
+
+
+-- Looking at total cases vs total deaths in US
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 AS death_perc
+FROM Portfolio_Project.dbo.Covid_deaths AS deaths
+WHERE location like '%States%'
+AND continent is not null
+ORDER BY 1,2
+
+
+-- Looking at total cases vs population in my country (Georgia)
 SELECT location, date, total_cases, population, (total_cases/population)*100 AS cases_per_capita
 FROM Portfolio_Project.dbo.Covid_deaths AS deaths
-WHERE continent = 'Georgia'
+WHERE location = 'Georgia'
 ORDER BY 1,2
+
 
 -- Countries with the highest infection rates compared to population
 SELECT location, MAX(total_cases) AS Highest_Infection_Count, population, MAX((total_cases/population))*100 AS max_cases_per_capita
 FROM Portfolio_Project.dbo.Covid_deaths
 GROUP BY location, population
 ORDER BY 4 DESC
+
 
 -- Showing countries with highest death count per population
 SELECT location, MAX(cast(total_deaths AS int)) AS Total_death_Count
@@ -72,8 +74,9 @@ WHERE continent is not null
 GROUP BY date
 ORDER BY 1,2
 
+
 -- Looking at vaccinations vs total population
--- Join datasets
+-- Joining datasets
 
 SELECT deaths.continent, deaths.location, deaths.date, deaths.population, vacc.new_vaccinations AS new_vaccs,
 	SUM(CONVERT(bigint, vacc.new_vaccinations)) OVER (PARTITION BY deaths.location ORDER BY deaths.location, deaths.date) AS cummulative_vaccs,
@@ -84,7 +87,8 @@ JOIN Portfolio_Project.dbo.Covid_vaccinations AS vacc
 WHERE deaths.continent is not null
 ORDER BY 2,3
 
--- > Looking at vaccinations using CTE
+
+-- > Looking at vaccinations using CTE to perform calculation on partition by
 WITH vacc_pop (continent, location, date, population, new_vaccinations, cummulative_vaccs)
 AS
 (
@@ -99,7 +103,8 @@ SELECT *, (cummulative_vaccs/CAST(population as float))*100 AS percent_vacc
 FROM vacc_pop
 ORDER BY 2,3
 
--- > Looking at vaccinations using Temp Tables
+
+-- > Looking at vaccinations using Temp Tables to perform calculation on partition by
 DROP TABLE IF EXISTS #vacc_pop_perc
 CREATE TABLE #vacc_pop_perc
 (
